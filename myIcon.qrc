@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/icon">
+    <file>arrow_drop_up_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.png</file>
+    <file>arrow_drop_down_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.png</file>
+  </qresource>
+</RCC>

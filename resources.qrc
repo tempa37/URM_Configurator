@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/icons">
+    <file alias="app">icons/ico_umvh.png</file>
+  </qresource>
+</RCC>

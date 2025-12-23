@@ -1,0 +1,6 @@
+dist/
+build/
+*.exe
+*.pkgdist/
+build/
+*.pkg
