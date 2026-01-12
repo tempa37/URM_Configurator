@@ -534,7 +534,9 @@ class UMVH(QMainWindow):
         if hasattr(self.ui, "stackedWidget_3") and hasattr(self.ui, "page_11"):
             self.ui.stackedWidget_3.setCurrentWidget(self.ui.page_11)
 
-
+        # --- наш новый wizard на stackedWidget_4 ---
+        if hasattr(self.ui, "stackedWidget_4") and hasattr(self.ui, "page_14"):
+            self.ui.stackedWidget_4.setCurrentWidget(self.ui.page_14)
 
 
 
@@ -638,9 +640,53 @@ class UMVH(QMainWindow):
         self.ui.OS_update.clicked.connect(self.select_firmware_file)
         self.ui.pushButton_7.clicked.connect(self.select_bootloader_file)
 
+        self.poller = None
+        self.pollthread = None
+        # --- навигация по stackedWidget_4 ---
+
+        # page_14 -> page_15
+        if hasattr(self.ui, "pushButton_8"):
+            self.ui.pushButton_8.clicked.connect(
+                lambda: self.ui.stackedWidget_4.setCurrentWidget(self.ui.page_15)
+            )
+
+        # page_15 -> page_16
+        if hasattr(self.ui, "pushButton_12"):
+            self.ui.pushButton_12.clicked.connect(
+                lambda: self.ui.stackedWidget_4.setCurrentWidget(self.ui.page_16)
+            )
+
+        # page_16 -> page_17
+        if hasattr(self.ui, "pushButton_10"):
+            self.ui.pushButton_10.clicked.connect(
+                lambda: self.ui.stackedWidget_4.setCurrentWidget(self.ui.page_17)
+            )
+
+        # page_17 -> page_14 (возврат в начало)
+        if hasattr(self.ui, "pushButton_15"):
+            self.ui.pushButton_15.clicked.connect(
+                lambda: self.ui.stackedWidget_4.setCurrentWidget(self.ui.page_14)
+            )
+
+
+
         reset_button = getattr(self.ui, "pushButton_22", None)
         if reset_button is not None:
             reset_button.clicked.connect(self.reset_application_state)
+
+        if hasattr(self.ui, "pushButton_9"):
+            self.ui.pushButton_9.clicked.connect(self._on_test1_clicked)
+
+            # событие 2 с page_17
+        if hasattr(self.ui, "pushButton_14"):
+            self.ui.pushButton_14.clicked.connect(self._on_test2_clicked)
+
+    # --- заглушки для тестов (добавь сюда) ---
+    def _on_test1_clicked(self):
+        print("test1")  # TODO: сюда логику тест1
+
+    def _on_test2_clicked(self):
+        print("test2")  # TODO: сюда логику события 2
 
     def switch_to(self, page_widget):
         self.ui.stackedWidget.setCurrentWidget(page_widget)
