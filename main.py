@@ -495,6 +495,61 @@ class BootloaderUpdateWorker(QObject):
             time.sleep(RETRY_DELAY)
         return False
 
+
+
+
+
+from PySide6.QtCore import Signal
+
+class TestLedSequenceWorker(QObject):
+    finished = Signal(bool)
+
+    def __init__(self, serial_port, slave_id, low_fill, lock, parent=None):
+        super().__init__(parent)
+        self.serial_port = serial_port
+        self.slave_id = slave_id
+        self.low_fill = low_fill
+        self.lock = lock
+        self.running = True
+
+    def stop(self):
+        self.running = False
+
+    @staticmethod
+    def checkcrc(packet):
+        if len(packet) < 2:
+            return False
+        calc_crc = AutoConnectWorker._calc_crc(packet[:-2])
+        recv_crc = int.from_bytes(packet[-2:], 'little')
+        return calc_crc == recv_crc
+
+    def run(self):
+        for step in range(8):
+            if not self.running:
+                self.finished.emit(False)
+                return
+            low_byte = self.low_fill
+            high_byte = 0xFF - (0xFF >> (step + 1))
+            coil_data = bytes([ high_byte, low_byte])
+            req_head = struct.pack('>BBHHB', self.slave_id, 0x0F, 0, 16, 2)
+            req = req_head + coil_data
+            crc_val = AutoConnectWorker._calc_crc(req)
+            req += struct.pack('<H', crc_val)
+            try:
+                with self.lock:
+                    self.serial_port.reset_input_buffer()
+                    self.serial_port.write(req)
+                    resp = self.serial_port.read(8)
+                if len(resp) != 8 or not self.checkcrc(resp):
+                    self.finished.emit(False)
+                    return
+            except Exception:
+                self.finished.emit(False)
+                return
+            time.sleep(0.5)
+        self.finished.emit(True)
+
+
 class UMVH(QMainWindow):
 
     def on_regs_polled(self, regs: list[int]):
@@ -527,6 +582,10 @@ class UMVH(QMainWindow):
 
         self._spin3_inited = False
         self._spin3_last_modbus_timeout = None
+
+        self.test_thread = None
+        self.test_worker = None
+        self._serial_lock = threading.Lock()  # если нет
 
         self.setWindowIcon(QIcon(":/icons/app"))
 
@@ -641,7 +700,7 @@ class UMVH(QMainWindow):
         self.ui.pushButton_7.clicked.connect(self.select_bootloader_file)
 
         self.poller = None
-        self.pollthread = None
+        self.poll_thread = None
         # --- навигация по stackedWidget_4 ---
 
         # page_14 -> page_15
@@ -681,12 +740,36 @@ class UMVH(QMainWindow):
         if hasattr(self.ui, "pushButton_14"):
             self.ui.pushButton_14.clicked.connect(self._on_test2_clicked)
 
+    def start_test_sequence(self, low_fill):
+        if not self.serial_port:
+            QMessageBox.warning(self, "Ошибка", "Нет соединения с портом")
+            return
+        slave_id = self.ui.spinBox2.value() if hasattr(self.ui, 'spinBox2') else self.serial_config.get('usart_id', 1)
+        if self.test_thread:
+            self.test_worker.stop()
+            self.test_thread.quit()
+            self.test_thread.wait()
+        self.test_thread = QThread()
+        self.test_worker = TestLedSequenceWorker(self.serial_port, slave_id, low_fill, self._serial_lock)
+        self.test_worker.moveToThread(self.test_thread)
+        self.test_thread.started.connect(self.test_worker.run)
+        self.test_worker.finished.connect(self.test_thread.quit)
+        self.test_worker.finished.connect(self.test_finished)
+        self.test_thread.start()
+
+    def test_finished(self, success):
+        self.test_thread = None
+        self.test_worker = None
+        status = "успешно" if success else "с ошибкой"
+        print(f"Тест завершён {status}")
+
+
     # --- заглушки для тестов (добавь сюда) ---
     def _on_test1_clicked(self):
-        print("test1")  # TODO: сюда логику тест1
+        self.start_test_sequence(0xFF)  # Низкие биты 1
 
     def _on_test2_clicked(self):
-        print("test2")  # TODO: сюда логику события 2
+        self.start_test_sequence(0x00)  # Низкие биты 0
 
     def switch_to(self, page_widget):
         self.ui.stackedWidget.setCurrentWidget(page_widget)
