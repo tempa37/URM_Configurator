@@ -500,15 +500,18 @@ class UMVH(QMainWindow):
     def on_regs_polled(self, regs: list[int]):
         self._last_regs = regs
         self._last_regs_ts = time.time()
-        self._spin3_inited = False  # <-- обязательно создать
+
 
         # Обновляем глобальную карту регистров
         device_registers.update(regs)
         # обновляем UI (пример: modbus timeout лежит в reg[2])
 
-        if not self._spin3_inited:
+        new_timeout = device_registers.modbustimeout
+
+        if (not self._spin3_inited) or (new_timeout != self._spin3_last_modbus_timeout):
             with self._block_widget_signals(self.ui.spinBox_3):
-                self.ui.spinBox_3.setValue(device_registers.modbustimeout)  # reg[2] [file:7]
+                self.ui.spinBox_3.setValue(new_timeout)
+            self._spin3_last_modbus_timeout = new_timeout
             self._spin3_inited = True
 
 
@@ -522,11 +525,18 @@ class UMVH(QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
+        self._spin3_inited = False
+        self._spin3_last_modbus_timeout = None
+
         self.setWindowIcon(QIcon(":/icons/app"))
 
         # при старте показываем страницу выбора файла (bootloader UI)
         if hasattr(self.ui, "stackedWidget_3") and hasattr(self.ui, "page_11"):
             self.ui.stackedWidget_3.setCurrentWidget(self.ui.page_11)
+
+
+
+
 
         # --- фикс скругления выпадающих списков --------------------------
         for combo in self.findChildren(QComboBox):
@@ -602,6 +612,13 @@ class UMVH(QMainWindow):
         self.ui.pushButton.clicked.connect(self.start_auto_connect)
         self.ui.pushButton_2.clicked.connect(lambda: self.switch_to(self.ui.page_3))
 
+        btn = getattr(self.ui, "pushButton_13", None)
+        if btn is not None:
+            btn.clicked.connect(self.on_pushButton_13_clicked)
+
+
+
+
         # page_3
         self.ui.pushButton_3.clicked.connect(lambda: self.switch_to(self.ui.page))
         self.ui.pushButton_11.clicked.connect(self.manual_connect)
@@ -670,6 +687,25 @@ class UMVH(QMainWindow):
     def on_port_selected(self, port_name: str):
         """Слот сохранения выбранного пользователем порта."""
         self.selected_port = port_name
+
+    def on_pushButton_13_clicked(self):
+        # 1) Остановить опрос, если он идет
+        if hasattr(self, "stop_polling"):
+            self.stop_polling()
+
+        # 2) Закрыть текущий COM, если открыт
+        if getattr(self, "serial_port", None) is not None:
+            try:
+                self.serial_port.close()
+            except Exception:
+                pass
+            self.serial_port = None
+
+        # 3) Сбросить выбранный порт (чтобы auto-select заново сработал)
+        self.selected_port = None
+
+        # 4) Перейти на стартовую страницу (там уже есть авто-обновление списка COM)
+        self.switch_to(self.ui.page)
 
 
 
@@ -1245,7 +1281,7 @@ class UMVH(QMainWindow):
 
         # 4) Порядок записи регистров
         order = [
-            REG_BAUD, REG_BITS, REG_PARITY, REG_STOP, REG_USART_ID,
+            REG_BAUD, REG_BITS, REG_PARITY, REG_STOP, REG_USART_ID, REG_MODBUSTIMEOUT
         ]
         for reg in order:
             if reg in regs:

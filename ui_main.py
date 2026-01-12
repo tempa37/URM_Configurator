@@ -1077,6 +1077,32 @@ class Ui_MainWindow(object):
         self.frame_12.setMinimumSize(QSize(529, 200))
         self.frame_12.setFrameShape(QFrame.Shape.StyledPanel)
         self.frame_12.setFrameShadow(QFrame.Shadow.Raised)
+        self.gridLayout_14 = QGridLayout(self.frame_12)
+        self.gridLayout_14.setObjectName(u"gridLayout_14")
+        self.gridLayout_13 = QGridLayout()
+        self.gridLayout_13.setObjectName(u"gridLayout_13")
+        self.frame_22 = QFrame(self.frame_12)
+        self.frame_22.setObjectName(u"frame_22")
+        self.frame_22.setFrameShape(QFrame.Shape.StyledPanel)
+        self.frame_22.setFrameShadow(QFrame.Shadow.Raised)
+
+        self.gridLayout_13.addWidget(self.frame_22, 0, 0, 1, 1)
+
+        self.pushButton_13 = QPushButton(self.frame_12)
+        self.pushButton_13.setObjectName(u"pushButton_13")
+
+        self.gridLayout_13.addWidget(self.pushButton_13, 0, 1, 1, 1)
+
+        self.frame_24 = QFrame(self.frame_12)
+        self.frame_24.setObjectName(u"frame_24")
+        self.frame_24.setFrameShape(QFrame.Shape.StyledPanel)
+        self.frame_24.setFrameShadow(QFrame.Shadow.Raised)
+
+        self.gridLayout_13.addWidget(self.frame_24, 0, 2, 1, 1)
+
+
+        self.gridLayout_14.addLayout(self.gridLayout_13, 0, 0, 1, 1)
+
 
         self.gridLayout_7.addWidget(self.frame_12, 1, 1, 1, 1)
 
@@ -2423,6 +2449,7 @@ class Ui_MainWindow(object):
 "li.checked::marker { content: \"\\2612\"; }\n"
 "</style></head><body style=\" font-family:'Noto Sans SC'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
 "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Modbus timeout</p></body></html>", None))
+        self.pushButton_13.setText(QCoreApplication.translate("MainWindow", u"\u041e\u0442\u043a\u043b\u044e\u0447\u0438\u0442\u044c", None))
         self.pushButton_4.setText(QCoreApplication.translate("MainWindow", u"\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c", None))
         self.textBrowser_73.setHtml(QCoreApplication.translate("MainWindow", u"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><meta charset=\"utf-8\" /><style type=\"text/css\">\n"
@@ -2457,8 +2484,8 @@ class Ui_MainWindow(object):
 "li.unchecked::marker { content: \"\\2610\"; }\n"
 "li.checked::marker { content: \"\\2612\"; }\n"
 "</style></head><body style=\" font-family:'Noto Sans SC'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
-"<p align=\"center\" style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:14pt;\">\u041f\u0435\u0440\u0435\u0432\u0435\u0434\u0438\u0442\u0435 \u0432\u0441\u0435 \u0442\u0443\u043c\u0431\u043b\u0435\u0440\u044b \u0432 \u043f\u043e\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0412\u041a\u041b, \u0430 \u0442\u0430\u043a \u0436\u0435 \u0442\u0443\u043c\u0431\u043b\u0435\u0440 \u0411\u041a\u041a \u0432 \u043f\u043e\u043b\u043e\u0436\u0435"
-                        "\u043d\u0438\u0435 \u0412\u041a\u041b.</span></p></body></html>", None))
+"<p align=\"center\" style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:14pt;\">\u041f\u0435\u0440\u0435\u0432\u0435\u0434\u0438\u0442\u0435 \u0432\u0441\u0435 \u0442\u0443\u043c\u0431\u043b\u0435\u0440\u044b \u0432 \u043f\u043e\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0432\u0432\u0435\u0440\u0445, \u0430 \u0442\u0430\u043a \u0436\u0435 \u0442\u0443\u043c\u0431\u043b\u0435\u0440 \u0411\u041a\u041a \u0432 \u043f\u043e\u043b\u043e"
+                        "\u0436\u0435\u043d\u0438\u0435 \u0412\u041a\u041b.</span></p></body></html>", None))
         self.pushButton_12.setText(QCoreApplication.translate("MainWindow", u"\u0414\u0430\u043b\u0435\u0435", None))
         self.textBrowser_13.setHtml(QCoreApplication.translate("MainWindow", u"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><meta charset=\"utf-8\" /><style type=\"text/css\">\n"
@@ -2478,8 +2505,8 @@ class Ui_MainWindow(object):
 "li.unchecked::marker { content: \"\\2610\"; }\n"
 "li.checked::marker { content: \"\\2612\"; }\n"
 "</style></head><body style=\" font-family:'Noto Sans SC'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
-"<p align=\"center\" style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:11pt;\">\u041f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u0442\u0443\u043c\u0431\u043b\u0435\u0440 \u0411\u041a\u041a \u0432 \u043f\u043e\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0432\u044b\u043a\u043b. \u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u0434\u0430\u043b\u0435\u0435, \u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432"
-                        "\u043e \u0434\u043e\u043b\u0436\u043d\u043e \u043f\u043e \u043f\u043e\u0440\u044f\u0434\u043a\u0443 \u0432\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0432\u0441\u0435 \u0440\u0435\u043b\u0435. (\u0420\u0435\u0436\u0438\u043c \u0431\u0435\u0437 \u0411\u041a\u041a)</span></p></body></html>", None))
+"<p align=\"center\" style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-size:11pt;\">\u041f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u0435 \u0432\u0441\u0435 \u0442\u0443\u043c\u0431\u043b\u0435\u0440\u044b \u0432 \u043f\u043e\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0432\u043d\u0438\u0437, \u0442\u0443\u043c\u0431\u043b\u0435\u0440 \u0411\u041a\u041a \u0432 \u043f\u043e\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u0432"
+                        "\u044b\u043a\u043b. \u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u0434\u0430\u043b\u0435\u0435, \u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u043e \u0434\u043e\u043b\u0436\u043d\u043e \u043f\u043e \u043f\u043e\u0440\u044f\u0434\u043a\u0443 \u0432\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0432\u0441\u0435 \u0440\u0435\u043b\u0435. (\u0420\u0435\u0436\u0438\u043c \u0431\u0435\u0437 \u0411\u041a\u041a)</span></p></body></html>", None))
         self.pushButton_14.setText(QCoreApplication.translate("MainWindow", u"\u0421\u0442\u0430\u0440\u0442", None))
         self.pushButton_15.setText(QCoreApplication.translate("MainWindow", u"\u0414\u0430\u043b\u0435\u0435", None))
         self.comboBox_2.setItemText(0, QCoreApplication.translate("MainWindow", u"8", None))
