@@ -37,7 +37,7 @@ MAX_PAYLOAD_SIZE   = MAX_PACKET_SIZE - HEADER_SIZE - CRC_SIZE
 MAX_RETRIES        = 3
 RETRY_DELAY        = 1
 
-MAX_FIRMWARE_FILE_SIZE = 24 * 1024  # 24 КБ
+MAX_FIRMWARE_FILE_SIZE = 28 * 1024  # 28 КБ
 
 # --- карта регистров ---------------------------------------------------
 # --- карта регистров (новая) ------------------------------------------
