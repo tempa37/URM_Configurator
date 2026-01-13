@@ -401,11 +401,13 @@ class FirmwareUpdateWorker(QObject):
         crc = AutoConnectWorker._calc_crc(frame)
         frame += crc.to_bytes(2, "little")
 
-        for _ in range(MAX_RETRIES):
+        for attempt in range(1, MAX_RETRIES + 1):
             try:
+                print(f"Пакет {idx}/{total} отправлен (попытка {attempt})")
                 self.serial_port.write(frame)
                 resp = self.serial_port.read(8)
                 if len(resp) >= 4:
+                    print(f"Ответ получен для пакета {idx}/{total}")
                     return True
             except serial.SerialException:
                 pass
@@ -484,11 +486,13 @@ class BootloaderUpdateWorker(QObject):
         crc = AutoConnectWorker._calc_crc(frame)
         frame += crc.to_bytes(2, "little")
 
-        for _ in range(MAX_RETRIES):
+        for attempt in range(1, MAX_RETRIES + 1):
             try:
+                print(f"Пакет {idx}/{total} отправлен (попытка {attempt})")
                 ser.write(frame)
                 resp = ser.read(8)
                 if len(resp) >= 4:
+                    print(f"Ответ получен для пакета {idx}/{total}")
                     return True
             except serial.SerialException:
                 pass
