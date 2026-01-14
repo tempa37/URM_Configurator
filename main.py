@@ -287,10 +287,14 @@ class RegisterPoller(QObject):
             self._running = False
             return None
         if len(resp) < expected_len or not self._check_crc(resp):
-            self._fail_count += 1
-            if self._fail_count >= 5:
-                self.connection_lost.emit()
-                self._running = False
+            if resp:
+                # Любой ответ (даже мусор) считаем признаком связи.
+                self._fail_count = 0
+            else:
+                self._fail_count += 1
+                if self._fail_count >= 5:
+                    self.connection_lost.emit()
+                    self._running = False
             time.sleep(1)
             return None
         regs = [int.from_bytes(resp[3 + i * 2 : 5 + i * 2], "big") for i in range(count)]
