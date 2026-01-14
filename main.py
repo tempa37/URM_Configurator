@@ -65,6 +65,17 @@ DEFAULT_BAUDRATE = 56000  # скорость по умолчанию для ав
 DEFAULT_BYTESIZE = serial.EIGHTBITS
 DEFAULT_PARITY   = serial.PARITY_NONE
 DEFAULT_STOPBITS = serial.STOPBITS_ONE
+LOW_BAUDRATE_FLUSH_LIMIT = 19200
+
+
+def _flush_if_low_baud(port: serial.Serial) -> None:
+    if not port:
+        return
+    try:
+        if port.baudrate is not None and port.baudrate <= LOW_BAUDRATE_FLUSH_LIMIT:
+            port.flush()
+    except serial.SerialException:
+        pass
 
 # --- параметры автозапроса настроек -----------------------------------
 AUTO_CONNECT_CMD = b"\x41"      # команда, которую нужно слать устройству в режиме автоподключения
@@ -109,6 +120,7 @@ class AutoConnectWorker(QObject):
             loop_started = time.monotonic()
             try:
                 ser.write(AUTO_CONNECT_CMD)
+                _flush_if_low_baud(ser)
             except serial.SerialException as exc:
                 self.error.emit(str(exc))
                 break
@@ -280,6 +292,7 @@ class RegisterPoller(QObject):
         try:
             with self._lock:
                 self.serial_port.write(req + crc.to_bytes(2, "little"))
+                _flush_if_low_baud(self.serial_port)
                 expected_len = 5 + count * 2
                 resp = self.serial_port.read(expected_len)
         except serial.SerialException as exc:
@@ -387,6 +400,7 @@ class FirmwareUpdateWorker(QObject):
             req = struct.pack(">BB", self.slave_id, FUNC_CODE_START)
             crc = AutoConnectWorker._calc_crc(req)
             self.serial_port.write(req + crc.to_bytes(2, "little"))
+            _flush_if_low_baud(self.serial_port)
             resp = self.serial_port.read(8)
             return len(resp) >= 4
         except serial.SerialException:
@@ -405,6 +419,7 @@ class FirmwareUpdateWorker(QObject):
             try:
                 print(f"Пакет {idx}/{total} отправлен (попытка {attempt})")
                 self.serial_port.write(frame)
+                _flush_if_low_baud(self.serial_port)
                 resp = self.serial_port.read(8)
                 if len(resp) >= 4:
                     print(f"Ответ получен для пакета {idx}/{total}")
@@ -490,6 +505,7 @@ class BootloaderUpdateWorker(QObject):
             try:
                 print(f"Пакет {idx}/{total} отправлен (попытка {attempt})")
                 ser.write(frame)
+                _flush_if_low_baud(ser)
                 resp = ser.read(8)
                 if len(resp) >= 4:
                     print(f"Ответ получен для пакета {idx}/{total}")
@@ -543,6 +559,7 @@ class TestLedSequenceWorker(QObject):
                 with self.lock:
                     self.serial_port.reset_input_buffer()
                     self.serial_port.write(req)
+                    _flush_if_low_baud(self.serial_port)
                     resp = self.serial_port.read(8)
                 if len(resp) != 8 or not self.checkcrc(resp):
                     self.finished.emit(False)
@@ -1026,6 +1043,7 @@ class UMVH(QMainWindow):
         req = struct.pack(">BBHH", slave, 3, REG_SENSOR_READ_START, 1)  # используем новый адрес регистра для проверки связи
         crc = AutoConnectWorker._calc_crc(req)
         ser.write(req + crc.to_bytes(2, "little"))
+        _flush_if_low_baud(ser)
         resp = ser.read(7)
 
         valid = False
@@ -1447,6 +1465,7 @@ class UMVH(QMainWindow):
             crc = AutoConnectWorker._calc_crc(req)
             with self._serial_lock:
                 self.serial_port.write(req + crc.to_bytes(2, "little"))
+                _flush_if_low_baud(self.serial_port)
                 resp = self.serial_port.read(7)
             if len(resp) != 7:
                 return None
@@ -1467,6 +1486,7 @@ class UMVH(QMainWindow):
             crc = AutoConnectWorker._calc_crc(req)
             with self._serial_lock:
                 self.serial_port.write(req + crc.to_bytes(2, "little"))
+                _flush_if_low_baud(self.serial_port)
                 resp = self.serial_port.read(8)
             if len(resp) != 8:
                 return False
