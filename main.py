@@ -439,7 +439,7 @@ class BootloaderUpdateWorker(QObject):
                 bytesize=DEFAULT_BYTESIZE,
                 parity=DEFAULT_PARITY,
                 stopbits=DEFAULT_STOPBITS,
-                timeout=1,
+                timeout=3,
             )
         except serial.SerialException:
             self.finished.emit(False)
