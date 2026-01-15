@@ -307,11 +307,12 @@ class FirmwareUpdateWorker(QObject):
     progress = Signal(int, str)
     finished = Signal(bool)
 
-    def __init__(self, serial_port: serial.Serial, slave_id: int, filename: str):
+    def __init__(self, serial_port: serial.Serial, slave_id: int, filename: str, lock: threading.Lock):
         super().__init__()
         self.serial_port = serial_port
         self.slave_id = slave_id
         self.filename = filename
+        self._lock = lock
         self._running = True
 
     def stop(self):
@@ -390,8 +391,9 @@ class FirmwareUpdateWorker(QObject):
         try:
             req = struct.pack(">BB", self.slave_id, FUNC_CODE_START)
             crc = AutoConnectWorker._calc_crc(req)
-            self.serial_port.write(req + crc.to_bytes(2, "little"))
-            resp = self.serial_port.read(8)
+            with self._lock:
+                self.serial_port.write(req + crc.to_bytes(2, "little"))
+                resp = self.serial_port.read(8)
             return len(resp) >= 4
         except serial.SerialException:
             return False
@@ -408,8 +410,9 @@ class FirmwareUpdateWorker(QObject):
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 print(f"Пакет {idx}/{total} отправлен (попытка {attempt})")
-                self.serial_port.write(frame)
-                resp = self.serial_port.read(8)
+                with self._lock:
+                    self.serial_port.write(frame)
+                    resp = self.serial_port.read(8)
                 if len(resp) >= 4:
                     print(f"Ответ получен для пакета {idx}/{total}")
                     return True
@@ -752,24 +755,31 @@ class UMVH(QMainWindow):
         if not self.serial_port:
             QMessageBox.warning(self, "Ошибка", "Нет соединения с портом")
             return
+        self.stop_polling()
         slave_id = self.ui.spinBox2.value() if hasattr(self.ui, 'spinBox2') else self.serial_config.get('usart_id', 1)
         if self.test_thread:
             self.test_worker.stop()
             self.test_thread.quit()
             self.test_thread.wait()
-        self.test_thread = QThread()
+        self.test_thread = QThread(self)
         self.test_worker = TestLedSequenceWorker(self.serial_port, slave_id, low_fill, self._serial_lock)
         self.test_worker.moveToThread(self.test_thread)
         self.test_thread.started.connect(self.test_worker.run)
         self.test_worker.finished.connect(self.test_thread.quit)
+        self.test_worker.finished.connect(self.test_worker.deleteLater)
         self.test_worker.finished.connect(self.test_finished)
+        self.test_thread.finished.connect(self.test_thread.deleteLater)
+        self.test_thread.finished.connect(self._on_test_thread_finished)
         self.test_thread.start()
 
     def test_finished(self, success):
-        self.test_thread = None
-        self.test_worker = None
         status = "успешно" if success else "с ошибкой"
         print(f"Тест завершён {status}")
+        self.start_polling()
+
+    def _on_test_thread_finished(self):
+        self.test_thread = None
+        self.test_worker = None
 
 
     # --- заглушки для тестов (добавь сюда) ---
@@ -833,7 +843,8 @@ class UMVH(QMainWindow):
         # 2) Закрыть текущий COM, если открыт
         if getattr(self, "serial_port", None) is not None:
             try:
-                self.serial_port.close()
+                with self._serial_lock:
+                    self.serial_port.close()
             except Exception:
                 pass
             self.serial_port = None
@@ -1130,7 +1141,8 @@ class UMVH(QMainWindow):
         }
         try:
             if self.serial_port:
-                self.serial_port.close()
+                with self._serial_lock:
+                    self.serial_port.close()
             self.serial_port = serial.Serial(
                 self.selected_port,
                 baudrate=cfg["baud"],
@@ -1194,7 +1206,8 @@ class UMVH(QMainWindow):
         # --- serial ------------------------------------------------------
         if getattr(self, "serial_port", None):
             try:
-                self.serial_port.close()
+                with self._serial_lock:
+                    self.serial_port.close()
             except serial.SerialException:
                 pass
         self.serial_port = None
@@ -1308,7 +1321,7 @@ class UMVH(QMainWindow):
         # \u043f\u043e \u0442\u0440\u0435\u0431\u043e\u0432\u0430\u043d\u0438\ю
         # \u043f\u043e\u0441\u044b\u043b\u0430\u0435\u043c \u0431\u043b\u043e\u043a\u0438
         # 0x2A \u043d\u0430 USART ID = 1
-        self.updater = FirmwareUpdateWorker(self.serial_port, slave, filename)
+        self.updater = FirmwareUpdateWorker(self.serial_port, slave, filename, self._serial_lock)
         self.updater.moveToThread(self.update_thread)
         self.update_thread.started.connect(self.updater.run)
         self.updater.progress.connect(self.update_progress)
@@ -1349,7 +1362,8 @@ class UMVH(QMainWindow):
         # останавливаем возможный опрос и закрываем порт
         self.stop_polling()
         if self.serial_port:
-            self.serial_port.close()
+            with self._serial_lock:
+                self.serial_port.close()
             self.serial_port = None
 
         self.ui.progressBar_2.setValue(0)
@@ -1494,7 +1508,8 @@ class UMVH(QMainWindow):
             self.bl_update_thread = None
             self.bl_updater = None
         if self.serial_port:
-            self.serial_port.close()
+            with self._serial_lock:
+                self.serial_port.close()
         self.switch_to(self.ui.page_5)
         QTimer.singleShot(5000, lambda: self.switch_to(self.ui.page))
 
@@ -1510,7 +1525,8 @@ class UMVH(QMainWindow):
             self.bl_update_thread = None
             self.bl_updater = None
         if self.serial_port:
-            self.serial_port.close()
+            with self._serial_lock:
+                self.serial_port.close()
         super().closeEvent(event)
 
 
