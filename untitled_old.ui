@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1058</width>
-    <height>859</height>
+    <height>862</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -17,7 +17,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>UMVH_Configurator</string>
+   <string>URM_Configurator</string>
   </property>
   <property name="layoutDirection">
    <enum>Qt::LayoutDirection::RightToLeft</enum>

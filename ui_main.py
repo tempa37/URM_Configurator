@@ -26,7 +26,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(1058, 859)
+        MainWindow.resize(1058, 862)
         MainWindow.setMinimumSize(QSize(1058, 859))
         MainWindow.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         MainWindow.setStyleSheet(u"background-color: rgb(89, 89, 89);\n"
@@ -2338,7 +2338,7 @@ class Ui_MainWindow(object):
     # setupUi
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"UMVH_Configurator", None))
+        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"URM_Configurator", None))
         self.textBrowser.setHtml(QCoreApplication.translate("MainWindow", u"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><meta charset=\"utf-8\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"

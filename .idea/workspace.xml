@@ -6,7 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="1a951498-aa9c-488a-b7df-0c7e94e9c008" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/icons/ico_umvh.ico" beforeDir="false" afterPath="$PROJECT_DIR$/icons/ico_umvh.ico" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/icons/ico_umvh.png" beforeDir="false" afterPath="$PROJECT_DIR$/icons/ico_umvh.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/resources_rc.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui_main.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/untitled_old.ui" beforeDir="false" afterPath="$PROJECT_DIR$/untitled_old.ui" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,7 +48,7 @@
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;pr-1&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;pr-3&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/Users/User/PycharmProjects/URM_Configurator&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
