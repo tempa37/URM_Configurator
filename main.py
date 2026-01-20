@@ -793,6 +793,9 @@ class UMVH(QMainWindow):
     def _on_test_thread_finished(self):
         self.test_thread = None
         self.test_worker = None
+        if self._pending_led_hold_stop_button and not self._led_hold_timer.isActive():
+            self._start_led_hold(self._pending_led_hold_stop_button)
+            self._pending_led_hold_stop_button = None
 
 
     # --- заглушки для тестов (добавь сюда) ---
