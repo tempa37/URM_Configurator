@@ -1332,6 +1332,10 @@ class UMVH(QMainWindow):
     def start_polling(self):
         if not self.serial_port:
             return
+        if self.poll_thread and self.poll_thread.isRunning():
+            return
+        if self.poll_thread or self.poller:
+            self.stop_polling()
         self.poll_thread = QThread()
         slave = self.serial_config.get("usart_id", 1)
         self.poller = RegisterPoller(self.serial_port, slave, self._serial_lock)
@@ -1348,6 +1352,8 @@ class UMVH(QMainWindow):
         if self.poll_thread:
             self.poll_thread.quit()
             self.poll_thread.wait()
+        self.poller = None
+        self.poll_thread = None
 
     def poll_error(self, msg: str):
         # выводим ошибку чтения в текстовое поле на странице ожидания
