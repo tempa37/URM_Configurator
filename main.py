@@ -808,6 +808,7 @@ class UMVH(QMainWindow):
         if not self.serial_port:
             return
         self._active_led_hold_stop_button = stop_button_name
+        self._send_all_leds()
         if not self._led_hold_timer.isActive():
             self._led_hold_timer.start()
 
