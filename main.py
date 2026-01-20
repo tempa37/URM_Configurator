@@ -784,7 +784,7 @@ class UMVH(QMainWindow):
     def test_finished(self, success):
         status = "успешно" if success else "с ошибкой"
         print(f"Тест завершён {status}")
-        if success and self._pending_led_hold_stop_button:
+        if self._pending_led_hold_stop_button:
             self._start_led_hold(self._pending_led_hold_stop_button)
         else:
             self.start_polling()
