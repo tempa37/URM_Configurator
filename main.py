@@ -841,6 +841,15 @@ class UMVH(QMainWindow):
     def _on_test_feedback_read(self, step, reg0_value, expected_high_byte):
         if not self._active_test_key:
             return
+        low_byte = 0xFF if self._active_test_key == "test1" else 0x00
+        if reg0_value < 0:
+            feedback_text = "нет данных"
+        else:
+            feedback_text = f"0x{reg0_value & 0xFF:02X}"
+        test_label = "1" if self._active_test_key == "test1" else "2"
+        print(
+            f"тест {test_label} команда 0x{expected_high_byte:02X} 0x{low_byte:02X}, ОС = {feedback_text}"
+        )
         self._test_feedback_records[self._active_test_key].append(
             {
                 "step": step,
