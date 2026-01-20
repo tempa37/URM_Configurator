@@ -597,6 +597,11 @@ class UMVH(QMainWindow):
         self.test_thread = None
         self.test_worker = None
         self._serial_lock = threading.Lock()  # если нет
+        self._led_hold_timer = QTimer(self)
+        self._led_hold_timer.setInterval(500)
+        self._led_hold_timer.timeout.connect(self._send_all_leds)
+        self._pending_led_hold_stop_button = None
+        self._active_led_hold_stop_button = None
 
         self.setWindowIcon(QIcon(":/icons/app"))
 
@@ -731,12 +736,14 @@ class UMVH(QMainWindow):
             self.ui.pushButton_10.clicked.connect(
                 lambda: self.ui.stackedWidget_4.setCurrentWidget(self.ui.page_17)
             )
+            self.ui.pushButton_10.clicked.connect(self._on_stop_led_hold_button_clicked)
 
         # page_17 -> page_14 (возврат в начало)
         if hasattr(self.ui, "pushButton_15"):
             self.ui.pushButton_15.clicked.connect(
                 lambda: self.ui.stackedWidget_4.setCurrentWidget(self.ui.page_14)
             )
+            self.ui.pushButton_15.clicked.connect(self._on_stop_led_hold_button_clicked)
 
 
 
@@ -754,7 +761,9 @@ class UMVH(QMainWindow):
     def start_test_sequence(self, low_fill):
         if not self.serial_port:
             QMessageBox.warning(self, "Ошибка", "Нет соединения с портом")
+            self._pending_led_hold_stop_button = None
             return
+        self.stop_led_hold()
         self.stop_polling()
         slave_id = self.ui.spinBox2.value() if hasattr(self.ui, 'spinBox2') else self.serial_config.get('usart_id', 1)
         if self.test_thread:
@@ -775,7 +784,11 @@ class UMVH(QMainWindow):
     def test_finished(self, success):
         status = "успешно" if success else "с ошибкой"
         print(f"Тест завершён {status}")
-        self.start_polling()
+        if success and self._pending_led_hold_stop_button:
+            self._start_led_hold(self._pending_led_hold_stop_button)
+        else:
+            self.start_polling()
+        self._pending_led_hold_stop_button = None
 
     def _on_test_thread_finished(self):
         self.test_thread = None
@@ -784,10 +797,52 @@ class UMVH(QMainWindow):
 
     # --- заглушки для тестов (добавь сюда) ---
     def _on_test1_clicked(self):
+        self._pending_led_hold_stop_button = "pushButton_10"
         self.start_test_sequence(0xFF)  # Низкие биты 1
 
     def _on_test2_clicked(self):
+        self._pending_led_hold_stop_button = "pushButton_15"
         self.start_test_sequence(0x00)  # Низкие биты 0
+
+    def _start_led_hold(self, stop_button_name):
+        if not self.serial_port:
+            return
+        self._active_led_hold_stop_button = stop_button_name
+        if not self._led_hold_timer.isActive():
+            self._led_hold_timer.start()
+
+    def stop_led_hold(self):
+        if self._led_hold_timer.isActive():
+            self._led_hold_timer.stop()
+        self._active_led_hold_stop_button = None
+
+    def _on_stop_led_hold_button_clicked(self):
+        sender = self.sender()
+        if sender is None:
+            return
+        sender_name = sender.objectName()
+        if self._active_led_hold_stop_button == sender_name:
+            self.stop_led_hold()
+            self.start_polling()
+
+    def _send_all_leds(self):
+        if not self.serial_port:
+            return
+        slave_id = self.ui.spinBox2.value() if hasattr(self.ui, "spinBox2") else self.serial_config.get("usart_id", 1)
+        coil_data = bytes([0xFF, 0xFF])
+        req_head = struct.pack(">BBHHB", slave_id, 0x0F, 0, 16, 2)
+        req = req_head + coil_data
+        crc_val = AutoConnectWorker._calc_crc(req)
+        req += struct.pack("<H", crc_val)
+        try:
+            with self._serial_lock:
+                self.serial_port.reset_input_buffer()
+                self.serial_port.write(req)
+                resp = self.serial_port.read(8)
+            if len(resp) != 8 or not TestLedSequenceWorker.checkcrc(resp):
+                return
+        except Exception:
+            return
 
     def switch_to(self, page_widget):
         self.ui.stackedWidget.setCurrentWidget(page_widget)
