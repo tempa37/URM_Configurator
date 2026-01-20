@@ -601,7 +601,9 @@ class UMVH(QMainWindow):
         self._led_hold_timer.setInterval(500)
         self._led_hold_timer.timeout.connect(self._send_all_leds)
         self._pending_led_hold_stop_button = None
+        self._pending_led_hold_coil_data = None
         self._active_led_hold_stop_button = None
+        self._led_hold_coil_data = None
 
         self.setWindowIcon(QIcon(":/icons/app"))
 
@@ -762,6 +764,7 @@ class UMVH(QMainWindow):
         if not self.serial_port:
             QMessageBox.warning(self, "Ошибка", "Нет соединения с портом")
             self._pending_led_hold_stop_button = None
+            self._pending_led_hold_coil_data = None
             return
         self.stop_led_hold()
         self.stop_polling()
@@ -785,33 +788,38 @@ class UMVH(QMainWindow):
         status = "успешно" if success else "с ошибкой"
         print(f"Тест завершён {status}")
         if self._pending_led_hold_stop_button:
-            self._start_led_hold(self._pending_led_hold_stop_button)
+            self._start_led_hold(self._pending_led_hold_stop_button, self._pending_led_hold_coil_data)
         else:
             self.start_polling()
         self._pending_led_hold_stop_button = None
+        self._pending_led_hold_coil_data = None
 
     def _on_test_thread_finished(self):
         self.test_thread = None
         self.test_worker = None
         if self._pending_led_hold_stop_button and not self._led_hold_timer.isActive():
-            self._start_led_hold(self._pending_led_hold_stop_button)
+            self._start_led_hold(self._pending_led_hold_stop_button, self._pending_led_hold_coil_data)
             self._pending_led_hold_stop_button = None
+            self._pending_led_hold_coil_data = None
 
 
     # --- заглушки для тестов (добавь сюда) ---
     def _on_test1_clicked(self):
         self._pending_led_hold_stop_button = "pushButton_10"
+        self._pending_led_hold_coil_data = bytes([0xFF, 0xFF])
         self.start_test_sequence(0xFF)  # Низкие биты 1
 
     def _on_test2_clicked(self):
         self._pending_led_hold_stop_button = "pushButton_15"
+        self._pending_led_hold_coil_data = bytes([0xFF, 0x00])
         self.start_test_sequence(0x00)  # Низкие биты 0
 
-    def _start_led_hold(self, stop_button_name):
+    def _start_led_hold(self, stop_button_name, coil_data):
         if not self.serial_port:
             return
         self._active_led_hold_stop_button = stop_button_name
-        self._send_all_leds()
+        self._led_hold_coil_data = coil_data
+        self._send_all_leds(self._led_hold_coil_data)
         if not self._led_hold_timer.isActive():
             self._led_hold_timer.start()
 
@@ -819,6 +827,7 @@ class UMVH(QMainWindow):
         if self._led_hold_timer.isActive():
             self._led_hold_timer.stop()
         self._active_led_hold_stop_button = None
+        self._led_hold_coil_data = None
 
     def _on_stop_led_hold_button_clicked(self):
         sender = self.sender()
@@ -829,11 +838,14 @@ class UMVH(QMainWindow):
             self.stop_led_hold()
             self.start_polling()
 
-    def _send_all_leds(self):
+    def _send_all_leds(self, coil_data=None):
         if not self.serial_port:
             return
+        if coil_data is None:
+            coil_data = self._led_hold_coil_data
+        if coil_data is None:
+            return
         slave_id = self.ui.spinBox2.value() if hasattr(self.ui, "spinBox2") else self.serial_config.get("usart_id", 1)
-        coil_data = bytes([0xFF, 0xFF])
         req_head = struct.pack(">BBHHB", slave_id, 0x0F, 0, 16, 2)
         req = req_head + coil_data
         crc_val = AutoConnectWorker._calc_crc(req)
