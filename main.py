@@ -561,6 +561,7 @@ class TestLedSequenceWorker(QObject):
             except Exception:
                 self.finished.emit(False, self.test_index, self.error_mask, self.reg0_reads)
                 return
+            time.sleep(0.5)
             reg0 = self._read_register0()
             if reg0 is None:
                 self.finished.emit(False, self.test_index, self.error_mask, self.reg0_reads)
@@ -577,7 +578,6 @@ class TestLedSequenceWorker(QObject):
                 f"reg0=0x{reg0:04X} feedback={feedback_byte:08b} match={match}"
             )
             print(f"[TEST {self.test_index + 1}] err = {self._format_error_mask(combined_error_mask)}")
-            time.sleep(0.5)
         self.finished.emit(True, self.test_index, self.error_mask, self.reg0_reads)
 
     def _read_register0(self) -> int | None:
