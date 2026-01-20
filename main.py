@@ -514,6 +514,7 @@ from PySide6.QtCore import Signal
 
 class TestLedSequenceWorker(QObject):
     finished = Signal(bool)
+    feedback_read = Signal(int, int, int)
 
     def __init__(self, serial_port, slave_id, low_fill, lock, parent=None):
         super().__init__(parent)
@@ -557,8 +558,23 @@ class TestLedSequenceWorker(QObject):
             except Exception:
                 self.finished.emit(False)
                 return
+            reg0_value = self._read_register0()
+            self.feedback_read.emit(step + 1, reg0_value if reg0_value is not None else -1, high_byte)
             time.sleep(0.5)
         self.finished.emit(True)
+
+    def _read_register0(self) -> int | None:
+        req = struct.pack(">BBHH", self.slave_id, 3, 0, 1)
+        crc = AutoConnectWorker._calc_crc(req)
+        try:
+            with self.lock:
+                self.serial_port.write(req + crc.to_bytes(2, "little"))
+                resp = self.serial_port.read(7)
+            if len(resp) != 7 or not self.checkcrc(resp):
+                return None
+            return int.from_bytes(resp[3:5], "big")
+        except Exception:
+            return None
 
 
 class UMVH(QMainWindow):
@@ -604,6 +620,8 @@ class UMVH(QMainWindow):
         self._pending_led_hold_coil_data = None
         self._active_led_hold_stop_button = None
         self._led_hold_coil_data = None
+        self._test_feedback_records = {"test1": [], "test2": []}
+        self._active_test_key = None
 
         self.setWindowIcon(QIcon(":/icons/app"))
 
@@ -746,6 +764,7 @@ class UMVH(QMainWindow):
                 lambda: self.ui.stackedWidget_4.setCurrentWidget(self.ui.page_14)
             )
             self.ui.pushButton_15.clicked.connect(self._on_stop_led_hold_button_clicked)
+            self.ui.pushButton_15.clicked.connect(self._show_test_summary)
 
 
 
@@ -760,12 +779,13 @@ class UMVH(QMainWindow):
         if hasattr(self.ui, "pushButton_14"):
             self.ui.pushButton_14.clicked.connect(self._on_test2_clicked)
 
-    def start_test_sequence(self, low_fill):
+    def start_test_sequence(self, low_fill, test_key):
         if not self.serial_port:
             QMessageBox.warning(self, "Ошибка", "Нет соединения с портом")
             self._pending_led_hold_stop_button = None
             self._pending_led_hold_coil_data = None
             return
+        self._active_test_key = test_key
         self.stop_led_hold()
         self.stop_polling()
         slave_id = self.ui.spinBox2.value() if hasattr(self.ui, 'spinBox2') else self.serial_config.get('usart_id', 1)
@@ -780,6 +800,7 @@ class UMVH(QMainWindow):
         self.test_worker.finished.connect(self.test_thread.quit)
         self.test_worker.finished.connect(self.test_worker.deleteLater)
         self.test_worker.finished.connect(self.test_finished)
+        self.test_worker.feedback_read.connect(self._on_test_feedback_read)
         self.test_thread.finished.connect(self.test_thread.deleteLater)
         self.test_thread.finished.connect(self._on_test_thread_finished)
         self.test_thread.start()
@@ -787,6 +808,7 @@ class UMVH(QMainWindow):
     def test_finished(self, success):
         status = "успешно" if success else "с ошибкой"
         print(f"Тест завершён {status}")
+        self._active_test_key = None
         if self._pending_led_hold_stop_button:
             self._start_led_hold(self._pending_led_hold_stop_button, self._pending_led_hold_coil_data)
         else:
@@ -807,12 +829,102 @@ class UMVH(QMainWindow):
     def _on_test1_clicked(self):
         self._pending_led_hold_stop_button = "pushButton_10"
         self._pending_led_hold_coil_data = bytes([0xFF, 0xFF])
-        self.start_test_sequence(0xFF)  # Низкие биты 1
+        self._test_feedback_records["test1"] = []
+        self.start_test_sequence(0xFF, "test1")  # Низкие биты 1
 
     def _on_test2_clicked(self):
         self._pending_led_hold_stop_button = "pushButton_15"
         self._pending_led_hold_coil_data = bytes([0xFF, 0x00])
-        self.start_test_sequence(0x00)  # Низкие биты 0
+        self._test_feedback_records["test2"] = []
+        self.start_test_sequence(0x00, "test2")  # Низкие биты 0
+
+    def _on_test_feedback_read(self, step, reg0_value, expected_high_byte):
+        if not self._active_test_key:
+            return
+        low_byte = 0xFF if self._active_test_key == "test1" else 0x00
+        if reg0_value < 0:
+            feedback_text = "нет данных"
+        else:
+            feedback_text = f"0x{reg0_value & 0xFF:02X}"
+        test_label = "1" if self._active_test_key == "test1" else "2"
+        print(
+            f"тест {test_label} команда 0x{expected_high_byte:02X} 0x{low_byte:02X}, ОС = {feedback_text}"
+        )
+        self._test_feedback_records[self._active_test_key].append(
+            {
+                "step": step,
+                "reg0": None if reg0_value < 0 else reg0_value,
+                "expected_high_byte": expected_high_byte,
+            }
+        )
+
+    def _show_test_summary(self):
+        mismatched_relays = []
+        for test_key, offset in (("test1", 0), ("test2", 8)):
+            records = self._test_feedback_records.get(test_key, [])
+            mismatched_relays.extend(self._evaluate_test_records(records, offset))
+        if mismatched_relays:
+            mismatch_text = ", ".join(str(relay) for relay in sorted(set(mismatched_relays)))
+            QMessageBox.information(
+                self,
+                "Результат теста",
+                f"Внимание! выявлено несоответствие регистров обратной связи и команд (реле {mismatch_text})",
+            )
+        else:
+            QMessageBox.information(
+                self,
+                "Результат теста",
+                "Тест прошел успешно, полное соответствие регистра обратной связи",
+            )
+
+    def _evaluate_test_records(self, records, relay_offset):
+        if not records:
+            return [relay_offset + step for step in range(1, 9)]
+        best_match_count = -1
+        best_nibble_index = 0
+        best_expected_source = "high"
+        for nibble_index in range(4):
+            for expected_source in ("high", "low"):
+                match_count = 0
+                for record in records:
+                    reg0 = record["reg0"]
+                    if reg0 is None:
+                        continue
+                    expected_high_byte = record["expected_high_byte"]
+                    expected_nibble = (
+                        (expected_high_byte >> 4) & 0x0F
+                        if expected_source == "high"
+                        else expected_high_byte & 0x0F
+                    )
+                    reg_nibble = (reg0 >> (nibble_index * 4)) & 0x0F
+                    if reg_nibble == expected_nibble:
+                        match_count += 1
+                if match_count > best_match_count:
+                    best_match_count = match_count
+                    best_nibble_index = nibble_index
+                    best_expected_source = expected_source
+        mismatched = []
+        seen_steps = set()
+        for record in records:
+            step = record["step"]
+            seen_steps.add(step)
+            reg0 = record["reg0"]
+            if reg0 is None:
+                mismatched.append(relay_offset + step)
+                continue
+            expected_high_byte = record["expected_high_byte"]
+            expected_nibble = (
+                (expected_high_byte >> 4) & 0x0F
+                if best_expected_source == "high"
+                else expected_high_byte & 0x0F
+            )
+            reg_nibble = (reg0 >> (best_nibble_index * 4)) & 0x0F
+            if reg_nibble != expected_nibble:
+                mismatched.append(relay_offset + step)
+        for step in range(1, 9):
+            if step not in seen_steps:
+                mismatched.append(relay_offset + step)
+        return mismatched
 
     def _start_led_hold(self, stop_button_name, coil_data):
         if not self.serial_port:
