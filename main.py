@@ -934,7 +934,7 @@ class UMVH(QMainWindow):
             test_mask = (error_mask >> (8 * test_index)) & 0xFF
             for bit in range(8):
                 if test_mask & (1 << bit):
-                    relay_number = 8 - bit
+                    relay_number = bit + 1
                     relays.add(relay_number)
         return relays
 
