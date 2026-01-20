@@ -513,15 +513,19 @@ class BootloaderUpdateWorker(QObject):
 from PySide6.QtCore import Signal
 
 class TestLedSequenceWorker(QObject):
-    finished = Signal(bool)
+    finished = Signal(bool, int, int, list)
 
-    def __init__(self, serial_port, slave_id, low_fill, lock, parent=None):
+    def __init__(self, serial_port, slave_id, low_fill, lock, test_index, parent=None):
         super().__init__(parent)
         self.serial_port = serial_port
         self.slave_id = slave_id
         self.low_fill = low_fill
         self.lock = lock
+        self.test_index = test_index
         self.running = True
+        self.error_mask = 0
+        self.reg0_reads: list[int] = []
+        self._feedback_byte_source = "high"
 
     def stop(self):
         self.running = False
@@ -537,7 +541,7 @@ class TestLedSequenceWorker(QObject):
     def run(self):
         for step in range(8):
             if not self.running:
-                self.finished.emit(False)
+                self.finished.emit(False, self.test_index, self.error_mask, self.reg0_reads)
                 return
             low_byte = self.low_fill
             high_byte = 0xFF - (0xFF >> (step + 1))
@@ -552,13 +556,58 @@ class TestLedSequenceWorker(QObject):
                     self.serial_port.write(req)
                     resp = self.serial_port.read(8)
                 if len(resp) != 8 or not self.checkcrc(resp):
-                    self.finished.emit(False)
+                    self.finished.emit(False, self.test_index, self.error_mask, self.reg0_reads)
                     return
             except Exception:
-                self.finished.emit(False)
+                self.finished.emit(False, self.test_index, self.error_mask, self.reg0_reads)
                 return
+            reg0 = self._read_register0()
+            if reg0 is None:
+                self.finished.emit(False, self.test_index, self.error_mask, self.reg0_reads)
+                return
+            self.reg0_reads.append(reg0)
+            feedback_byte = self._select_feedback_byte(reg0)
+            mismatch = high_byte ^ feedback_byte
+            self.error_mask |= mismatch
+            match = mismatch == 0
+            combined_error_mask = self.error_mask << (8 * self.test_index)
+            print(
+                f"[TEST {self.test_index + 1}] step {step + 1}: "
+                f"cmd={high_byte:08b} low={low_byte:08b} "
+                f"reg0=0x{reg0:04X} feedback={feedback_byte:08b} match={match}"
+            )
+            print(f"[TEST {self.test_index + 1}] err = {self._format_error_mask(combined_error_mask)}")
             time.sleep(0.5)
-        self.finished.emit(True)
+        self.finished.emit(True, self.test_index, self.error_mask, self.reg0_reads)
+
+    def _read_register0(self) -> int | None:
+        req = struct.pack(">BBHH", self.slave_id, 3, 0, 1)
+        crc = AutoConnectWorker._calc_crc(req)
+        try:
+            with self.lock:
+                self.serial_port.write(req + crc.to_bytes(2, "little"))
+                resp = self.serial_port.read(7)
+        except Exception:
+            return None
+        if len(resp) != 7 or not self.checkcrc(resp):
+            return None
+        return int.from_bytes(resp[3:5], "big")
+
+    def _select_feedback_byte(self, reg0: int) -> int:
+        low_byte = reg0 & 0xFF
+        high_byte = (reg0 >> 8) & 0xFF
+        if high_byte and not low_byte:
+            self._feedback_byte_source = "high"
+        elif low_byte and not high_byte:
+            self._feedback_byte_source = "low"
+        if self._feedback_byte_source == "low":
+            return low_byte
+        return high_byte
+
+    @staticmethod
+    def _format_error_mask(mask: int) -> str:
+        binary = f"{mask:016b}"
+        return " ".join(binary[i : i + 4] for i in range(0, 16, 4))
 
 
 class UMVH(QMainWindow):
@@ -597,6 +646,10 @@ class UMVH(QMainWindow):
         self.test_thread = None
         self.test_worker = None
         self._serial_lock = threading.Lock()  # если нет
+        self._relay_feedback_error_mask = 0
+        self._relay_feedback_reads = {}
+        self._tests_completed = set()
+        self._current_test_index = None
         self._led_hold_timer = QTimer(self)
         self._led_hold_timer.setInterval(500)
         self._led_hold_timer.timeout.connect(self._send_all_leds)
@@ -746,6 +799,7 @@ class UMVH(QMainWindow):
                 lambda: self.ui.stackedWidget_4.setCurrentWidget(self.ui.page_14)
             )
             self.ui.pushButton_15.clicked.connect(self._on_stop_led_hold_button_clicked)
+            self.ui.pushButton_15.clicked.connect(self._show_test_results)
 
 
 
@@ -769,12 +823,19 @@ class UMVH(QMainWindow):
         self.stop_led_hold()
         self.stop_polling()
         slave_id = self.ui.spinBox2.value() if hasattr(self.ui, 'spinBox2') else self.serial_config.get('usart_id', 1)
+        test_index = self._current_test_index if self._current_test_index is not None else 0
         if self.test_thread:
             self.test_worker.stop()
             self.test_thread.quit()
             self.test_thread.wait()
         self.test_thread = QThread(self)
-        self.test_worker = TestLedSequenceWorker(self.serial_port, slave_id, low_fill, self._serial_lock)
+        self.test_worker = TestLedSequenceWorker(
+            self.serial_port,
+            slave_id,
+            low_fill,
+            self._serial_lock,
+            test_index,
+        )
         self.test_worker.moveToThread(self.test_thread)
         self.test_thread.started.connect(self.test_worker.run)
         self.test_worker.finished.connect(self.test_thread.quit)
@@ -784,9 +845,14 @@ class UMVH(QMainWindow):
         self.test_thread.finished.connect(self._on_test_thread_finished)
         self.test_thread.start()
 
-    def test_finished(self, success):
+    def test_finished(self, success, test_index, error_mask, reg0_reads):
         status = "успешно" if success else "с ошибкой"
         print(f"Тест завершён {status}")
+        combined_error_mask = error_mask << (8 * test_index)
+        self._relay_feedback_error_mask |= combined_error_mask
+        self._relay_feedback_reads[test_index] = reg0_reads
+        self._tests_completed.add(test_index)
+        print(f"Итоговый err = {self._format_error_mask(self._relay_feedback_error_mask)}")
         if self._pending_led_hold_stop_button:
             self._start_led_hold(self._pending_led_hold_stop_button, self._pending_led_hold_coil_data)
         else:
@@ -805,11 +871,16 @@ class UMVH(QMainWindow):
 
     # --- заглушки для тестов (добавь сюда) ---
     def _on_test1_clicked(self):
+        self._relay_feedback_error_mask = 0
+        self._relay_feedback_reads = {}
+        self._tests_completed.clear()
+        self._current_test_index = 0
         self._pending_led_hold_stop_button = "pushButton_10"
         self._pending_led_hold_coil_data = bytes([0xFF, 0xFF])
         self.start_test_sequence(0xFF)  # Низкие биты 1
 
     def _on_test2_clicked(self):
+        self._current_test_index = 1
         self._pending_led_hold_stop_button = "pushButton_15"
         self._pending_led_hold_coil_data = bytes([0xFF, 0x00])
         self.start_test_sequence(0x00)  # Низкие биты 0
@@ -837,6 +908,40 @@ class UMVH(QMainWindow):
         if self._active_led_hold_stop_button == sender_name:
             self.stop_led_hold()
             self.start_polling()
+
+    def _show_test_results(self):
+        if not self._tests_completed:
+            return
+        if self._relay_feedback_error_mask == 0:
+            QMessageBox.information(
+                self,
+                "Результат теста",
+                "Тест прошел успешно, полное соответствие регистра обратной связи",
+            )
+            return
+        relays = sorted(self._get_error_relays(self._relay_feedback_error_mask))
+        relays_text = ", ".join(str(relay) for relay in relays)
+        QMessageBox.warning(
+            self,
+            "Результат теста",
+            f"Внимание! выявлено несоответствие регистров обратной связи и команд (реле {relays_text})",
+        )
+
+    @staticmethod
+    def _get_error_relays(error_mask: int) -> set[int]:
+        relays = set()
+        for test_index in range(2):
+            test_mask = (error_mask >> (8 * test_index)) & 0xFF
+            for bit in range(8):
+                if test_mask & (1 << bit):
+                    relay_number = 8 - bit
+                    relays.add(relay_number)
+        return relays
+
+    @staticmethod
+    def _format_error_mask(mask: int) -> str:
+        binary = f"{mask:016b}"
+        return " ".join(binary[i : i + 4] for i in range(0, 16, 4))
 
     def _send_all_leds(self, coil_data=None):
         if not self.serial_port:
