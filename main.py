@@ -24,6 +24,25 @@ from PySide6.QtGui import QIcon
 
 from ui_main import Ui_MainWindow
 
+
+def _calc_modbus_crc(data: bytes) -> int:
+    """Вычисляет CRC16 Modbus для кадров конфигуратора."""
+    crc = 0xFFFF
+    for ch in data:
+        crc ^= ch
+        for _ in range(8):
+            if crc & 1:
+                crc = (crc >> 1) ^ 0xA001
+            else:
+                crc >>= 1
+    return crc
+
+
+def _append_modbus_crc(data: bytes) -> bytes:
+    """Добавляет CRC в принятом в Modbus RTU порядке: младший байт, затем старший."""
+    return data + _calc_modbus_crc(data).to_bytes(2, byteorder="little")
+
+
 # --- константы для обновления ---
 FUNC_CODE_FIRMWARE = 0x2A
 FUNC_CODE_START    = 0x2B
@@ -67,8 +86,9 @@ DEFAULT_PARITY   = serial.PARITY_NONE
 DEFAULT_STOPBITS = serial.STOPBITS_ONE
 
 # --- параметры автозапроса настроек -----------------------------------
-AUTO_CONNECT_CMD = b"\x42"      # команда, которую нужно слать устройству в режиме автоподключения
-AUTO_CONNECT_INTERVAL = 0.2     # период отправки команды 0x41 в секундах (200 мс)
+AUTO_CONNECT_DATA = bytes((0x42, 0xFF, 0xFF, 0xFF, 0xFF))
+AUTO_CONNECT_CMD = _append_modbus_crc(AUTO_CONNECT_DATA)  # 5 байт данных + 2 байта CRC
+AUTO_CONNECT_INTERVAL = 0.2     # период отправки команды в секундах (200 мс)
 AUTO_CONNECT_RESPONSE_LEN = 15  # ожидаемый размер ответа с настройками (байт)
 
 
@@ -129,16 +149,7 @@ class AutoConnectWorker(QObject):
     # ------ вспомогательные функции ---------------------------------
     @staticmethod
     def _calc_crc(data: bytes) -> int:
-        crc = 0xFFFF
-        for ch in data:
-            crc ^= ch
-            for _ in range(8):
-                if crc & 1:
-                    crc >>= 1
-                    crc ^= 0xA001
-                else:
-                    crc >>= 1
-        return crc
+        return _calc_modbus_crc(data)
 
     def _check_crc(self, packet: bytes) -> bool:
         recv = int.from_bytes(packet[-2:], byteorder="little")
